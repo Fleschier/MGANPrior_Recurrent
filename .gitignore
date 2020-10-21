@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.ipynb_checkpoints
+.idea/
+
+log.txt
+
+derivable_models/karras_model/
+.idea/
+/results/
+/GAN/pretrain/pytorch
+/GAN/pretrain/tensorflow
+/data/
+/example_test_inversion/
+test.ipynb
