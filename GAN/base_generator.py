@@ -349,13 +349,19 @@ class BaseGenerator(object):
     # out：剪裁后的数组存入的数组
     # clip这个函数将将数组中的元素限制在a_min, a_max之间,这里限制到[0,255]
     images = np.clip(images + 0.5, 0, 255).astype(np.uint8)
-    # 
+    # numpy.transpose(a, axes=None)
+    # Reverse or permute the axes of an array; returns the modified array.
+    # For an array a with two axes, transpose(a) gives the matrix transpose.
+
+    # 输入为:[batch_size, channel, height, width], 转置 123轴为231后,
+    # 输出为:  [batch_size, height, width, channel].
     images = images.transpose(0, 2, 3, 1)
-    if self.image_channels == 3 and self.channel_order == 'BGR':
-      images = images[:, :, :, ::-1]
+    if self.image_channels == 3 and self.channel_order == 'BGR':  # 将'BGR'转为'RGB'
+      images = images[:, :, :, ::-1]  # 四个维度, 最后一个取逆序, 即上边转置之后的channel
 
     return images
 
+  # 打包上述两个方法
   def easy_synthesize(self, latent_codes, **kwargs):
     """Wraps functions `synthesize()` and `postprocess()` together."""
     outputs = self.synthesize(latent_codes, **kwargs)

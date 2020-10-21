@@ -1,1 +1,1 @@
-# MGANPrior_Recurrent
+# MGANPrior_Reproduce

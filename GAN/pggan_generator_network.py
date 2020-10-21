@@ -15,6 +15,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# 开放接口
 __all__ = ['PGGANGeneratorNet']
 
 # Resolutions allowed.
@@ -35,8 +36,10 @@ class PGGANGeneratorNet(nn.Module):
                z_space_dim=512,
                image_channels=3,
                fused_scale=False,
-               fmaps_base=16 << 10,
-               fmaps_max=512):
+              # 层与层之间会有若干个卷积核（kernel），上一层中的每个feature map(特征图)跟每个卷积核做卷积，
+              # 对应产生下一层的一个feature map。
+               fmaps_base=16 << 10,   # 1 0000 0000 0000 00, 即2^14   
+               fmaps_max=512):        # 设置为z_space_dim一样的值
     """Initializes the generator with basic settings.
 
     Args:
@@ -46,7 +49,7 @@ class PGGANGeneratorNet(nn.Module):
       fused_scale: Whether to fused `upsample` and `conv2d` together, resulting
         in `conv2d_transpose`. (default: False)
       fmaps_base: Base factor to compute number of feature maps for each layer.
-        (default: 16 << 10)
+        (default: 16 << 10)   
       fmaps_max: Maximum number of feature maps in each layer. (default: 512)
 
     Raises:
@@ -58,9 +61,9 @@ class PGGANGeneratorNet(nn.Module):
       raise ValueError(f'Invalid resolution: {resolution}!\n'
                        f'Resolutions allowed: {_RESOLUTIONS_ALLOWED}.')
 
-    self.init_res = _INIT_RES
+    self.init_res = _INIT_RES   # 卷积运算选取的卷积核大小, 这里是4*4
     self.init_res_log2 = int(np.log2(self.init_res))
-    self.resolution = resolution
+    self.resolution = resolution  # 分辨率 1024*1024默认
     self.final_res_log2 = int(np.log2(self.resolution))
     self.z_space_dim = z_space_dim
     self.image_channels = image_channels
@@ -68,19 +71,29 @@ class PGGANGeneratorNet(nn.Module):
     self.fmaps_base = fmaps_base
     self.fmaps_max = fmaps_max
 
+    ###  做什么用的?
     self.num_layers = (self.final_res_log2 - self.init_res_log2 + 1) * 2
 
+    # torch.nn.Parameter(torch.FloatTensor(hidden_size))
+    # 将一个固定不可训练的tensor转换成可以训练的类型parameter，并将这个parameter绑定到这个module里面所以经过类型转换
+    # 这个self.v变成了模型的一部分，成为了模型中根据训练可以改动的参数了。
+    # 使用这个函数的目的也是想让某些变量在学习的过程中不断的修改其值以达到最优化。
+
+    # 使用nn.Parameter()来转换一个固定的权重数值，使的其可以跟着网络训练一直调优下去，学习到一个最适合的权重值。
     self.lod = nn.Parameter(torch.zeros(()))
     self.pth_to_tf_var_mapping = {'lod': 'lod'}
-    for res_log2 in range(self.init_res_log2, self.final_res_log2 + 1):
-      res = 2 ** res_log2
+
+    for res_log2 in range(self.init_res_log2, self.final_res_log2 + 1):   ### 为什么要取log呢?
+      res = 2 ** res_log2 # 乘方
       block_idx = res_log2 - self.init_res_log2
 
       # First convolution layer for each resolution.
-      if res == self.init_res:
-        self.add_module(
+      if res == self.init_res:        # 第一层卷积层
+        self.add_module(  # def add_module(self, name: str, module: 'Module')
             f'layer{2 * block_idx}',
-            ConvBlock(in_channels=self.z_space_dim,
+            # 卷积核的输入通道数（in depth）由输入矩阵的通道数(z_space_dim)所决定
+            # 输出矩阵的通道数（out depth）由卷积核的输出通道数所决定(即卷积核或者feature maps的个数)
+            ConvBlock(in_channels=self.z_space_dim,   # 输入的通道数, 即为z_space_dim
                       out_channels=self.get_nf(res),
                       kernel_size=self.init_res,
                       padding=3))
@@ -137,6 +150,7 @@ class PGGANGeneratorNet(nn.Module):
           f'ToRGB_lod{self.final_res_log2 - res_log2}/bias')
     self.upsample = ResolutionScalingLayer()
 
+  # 计算feature maps的数量,作为输出矩阵的通道数
   def get_nf(self, res):
     """Gets number of feature maps according to current resolution."""
     return min(self.fmaps_base // res, self.fmaps_max)
@@ -160,7 +174,7 @@ class PGGANGeneratorNet(nn.Module):
         image = self.upsample(image)
     return image
 
-
+# 实现逐像素特征向量归一化层
 class PixelNormLayer(nn.Module):
   """Implements pixel-wise feature vector normalization layer."""
 
@@ -172,6 +186,7 @@ class PixelNormLayer(nn.Module):
     return x / torch.sqrt(torch.mean(x ** 2, dim=1, keepdim=True) + self.eps)
 
 
+# 该层用于通过最近邻插值从空间域对feature maps进行上采样, 从而实现提高图像分辨率
 class ResolutionScalingLayer(nn.Module):
   """Implements the resolution scaling layer.
 
@@ -184,6 +199,11 @@ class ResolutionScalingLayer(nn.Module):
     self.scale_factor = scale_factor
 
   def forward(self, x):
+    # 上下采样方法interpolate
+    # torch.nn.functional.interpolate(input, size=None, scale_factor=None, mode='nearest', align_corners=None)
+    # input (Tensor) – 输入张量
+    # size (int or Tuple[int] or Tuple[int, int] or Tuple[int, int, int]) – 输出大小.
+    # scale_factor (float or Tuple[float]) – 指定输出为输入的多少倍数。如果输入为tuple，其也要制定为tuple类型
     return F.interpolate(x, scale_factor=self.scale_factor, mode='nearest')
 
 
@@ -204,8 +224,7 @@ class WScaleLayer(nn.Module):
   def forward(self, x):
     return x * self.scale + self.bias.view(1, -1, 1, 1)
 
-
-# 卷积块
+# 这层依次调用多层神经网络
 class ConvBlock(nn.Module):
   """Implements the convolutional block.
 
@@ -217,9 +236,9 @@ class ConvBlock(nn.Module):
   def __init__(self,
                in_channels,
                out_channels,
-               kernel_size=3,
-               stride=1,
-               padding=1,
+               kernel_size=3,   # 卷积核的尺寸
+               stride=1,    # 卷积核移动的步长
+               padding=1,   # 填充宽度
                dilation=1,
                add_bias=False,
                upsample=False,
@@ -248,14 +267,14 @@ class ConvBlock(nn.Module):
     """
     super().__init__()
 
-    self.pixel_norm = PixelNormLayer()
+    self.pixel_norm = PixelNormLayer()  
 
     if upsample and not fused_scale:
-      self.upsample = ResolutionScalingLayer()
+      self.upsample = ResolutionScalingLayer()  # 上采样提高分辨率
     else:
-      self.upsample = nn.Identity()
+      self.upsample = nn.Identity()   # 占位, 不区分参数
 
-    if upsample and fused_scale:
+    if upsample and fused_scale:    # fused_scale=True, 则融合upsample和conv2d
       self.use_conv2d_transpose = True
       self.weight = nn.Parameter(
           torch.randn(kernel_size, kernel_size, in_channels, out_channels))
@@ -277,6 +296,7 @@ class ConvBlock(nn.Module):
                               kernel_size=kernel_size,
                               gain=wscale_gain)
 
+    # 选择激励函数
     if activation_type == 'linear':
       self.activate = nn.Identity()
     elif activation_type == 'lrelu':
@@ -287,9 +307,10 @@ class ConvBlock(nn.Module):
       raise NotImplementedError(f'Not implemented activation function: '
                                 f'{activation_type}!')
 
-  def forward(self, x):
+  def forward(self, x): # 依次调用各层
     x = self.pixel_norm(x)
     x = self.upsample(x)
+
     if self.use_conv2d_transpose:
       kernel = self.weight * self.scale
       kernel = F.pad(kernel, (0, 0, 0, 0, 1, 1, 1, 1), 'constant', 0.0)
@@ -300,6 +321,7 @@ class ConvBlock(nn.Module):
       x = x / self.scale
     else:
       x = self.conv(x)
+      
     x = self.wscale(x)
     x = self.activate(x)
     return x

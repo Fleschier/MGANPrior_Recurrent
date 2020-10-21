@@ -17,6 +17,11 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '..'))
 from GAN.base_generator import BaseGenerator
 from GAN.pggan_generator_network import PGGANGeneratorNet
 
+import pickle
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning)
+import tensorflow as tf
+
 __all__ = ['PGGANGenerator']
 
 
@@ -31,24 +36,23 @@ class PGGANGenerator(BaseGenerator):
 
   def build(self):
     self.check_attr('fused_scale')
+    # 初始化神经网络
     self.net = PGGANGeneratorNet(resolution=self.resolution,
                                  z_space_dim=self.z_space_dim,
                                  image_channels=self.image_channels,
                                  fused_scale=self.fused_scale)
     self.num_layers = self.net.num_layers
 
+  # 转化tensorflow张量到pytorch张量
   def convert_tf_weights(self, test_num=10):
     # pylint: disable=import-outside-toplevel
-    import sys
-    import pickle
-    import warnings
-    warnings.filterwarnings('ignore', category=FutureWarning)
-    import tensorflow as tf
+    ### 待完成***************************************************************************
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
     # pylint: enable=import-outside-toplevel
 
     sess = tf.compat.v1.InteractiveSession()
 
+    # 读取pkl文件获取变量等信息
     self.logger.info(f'Loading tf weights from `{self.tf_weight_path}`.')
     self.check_attr('tf_code_path')
     sys.path.insert(0, self.tf_code_path)
@@ -57,6 +61,7 @@ class PGGANGenerator(BaseGenerator):
     sys.path.pop(0)
     self.logger.info(f'Successfully loaded!')
 
+    # 转化  tensorflow权重 -->  pytorch权重
     self.logger.info(f'Converting tf weights to pytorch version.')
     tf_vars = dict(tf_net.__getstate__()['variables'])
     state_dict = self.net.state_dict()
@@ -76,6 +81,7 @@ class PGGANGenerator(BaseGenerator):
       state_dict[pth_var_name] = var
     self.logger.info(f'Successfully converted!')
 
+    # 保存pytorch版本
     self.logger.info(f'Saving pytorch weights to `{self.weight_path}`.')
     for var_name in self.model_specific_vars:
       del state_dict[var_name]
@@ -95,7 +101,7 @@ class PGGANGenerator(BaseGenerator):
     tf_fake_label = np.zeros((1, label_dim), np.float32)
     total_distance = 0.0
     for i in range(test_num):
-      latent_code = self.easy_sample(1)
+      latent_code = self.easy_sample(1)     # 采样+预处理
       tf_output = tf_net.run(latent_code, tf_fake_label)
       pth_output = self.synthesize(latent_code)['image']
       distance = np.average(np.abs(tf_output - pth_output))
@@ -105,10 +111,12 @@ class PGGANGenerator(BaseGenerator):
 
     sess.close()
 
+  # 从通道中采样
   def sample(self, num, **kwargs):
     assert num > 0
     return np.random.randn(num, self.z_space_dim).astype(np.float32)
 
+  # 预处理
   def preprocess(self, latent_codes, **kwargs):
     if not isinstance(latent_codes, np.ndarray):
       raise ValueError(f'Latent codes should be with type `numpy.ndarray`!')
@@ -118,6 +126,7 @@ class PGGANGenerator(BaseGenerator):
     latent_codes = latent_codes / norm * np.sqrt(self.z_space_dim)
     return latent_codes.astype(np.float32)
 
+  # 从latent codes中生成图片
   def _synthesize(self, latent_codes):
     if not isinstance(latent_codes, np.ndarray):
       raise ValueError(f'Latent codes should be with type `numpy.ndarray`!')
@@ -143,5 +152,6 @@ class PGGANGenerator(BaseGenerator):
 
     return results
 
+  # 分批运行
   def synthesize(self, latent_codes, **kwargs):
     return self.batch_run(latent_codes, self._synthesize)
