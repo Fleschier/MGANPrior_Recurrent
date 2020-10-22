@@ -82,35 +82,45 @@ class PGGANGeneratorNet(nn.Module):
 
     # 使用nn.Parameter()来转换一个固定的权重数值，使的其可以跟着网络训练一直调优下去，学习到一个最适合的权重值。
     self.lod = nn.Parameter(torch.zeros(()))
-    self.pth_to_tf_var_mapping = {'lod': 'lod'}
+    self.pth_to_tf_var_mapping = {'lod': 'lod'}   # 保存每一层网络的权重和偏置的路径
 
     for res_log2 in range(self.init_res_log2, self.final_res_log2 + 1):   # 范围 [2, 10]
       res = 2 ** res_log2 # 乘方      res的范围: 4 ~ 1024, 为2的指数倍
       block_idx = res_log2 - self.init_res_log2   # [0,8]
 
       # First convolution layer for each resolution.
-      # 第一层卷积块(含多层神经网络)
-      if res == self.init_res:        
-        self.add_module(  # def add_module(self, name: str, module: 'Module')
+      """
+      卷积块(含多层神经网络)
+      或者理解为,卷积层分为三级: 卷积级, 探测级(使用激励函数非线性化), 池化级
+      """
+      if res == self.init_res:          # 接收输入的第一层卷积层
+        self.add_module(  
+            """
+            输入参数为Module.add_module(name: str, module: Module)。
+            功能为，为Module添加一个子module，对应名字为name
+            用torch.nn.Sequential()容器进行快速搭建时，模型的各层被顺序添加到容器中。缺点是每层的编号是默认的阿拉伯数字，不易区分
+            通过add_module()添加每一层，并且为每一层增加了一个单独的名字。
+            """
             f'layer{2 * block_idx}',    # block_idx [0, 8]
             # 卷积核的输入通道数（in depth）由输入矩阵的通道数(z_space_dim)所决定
             # 输出矩阵的通道数（out depth）由卷积核的输出通道数所决定(即卷积核或者feature maps的个数)
             ConvBlock(in_channels=self.z_space_dim,   # 由于是第一层,故输入的通道数为初始输入矩阵的z_space_dim
                       out_channels=self.get_nf(res),  # 输出的通道数, 
-                      kernel_size=self.init_res,
-                      padding=3))   # padding=3, 默认stride为1, 默认kernel size为3
+                      kernel_size=self.init_res,    # 卷积核的尺寸设为初始尺寸=4, 默认kernel size为3
+                      padding=3))   # padding=3, 默认stride为1, 默认dilation rate=1   则输出的宽度会变为 n+3
+        # 路径存入字典
         self.pth_to_tf_var_mapping[f'layer{2 * block_idx}.conv.weight'] = (
             f'{res}x{res}/Dense/weight')
         self.pth_to_tf_var_mapping[f'layer{2 * block_idx}.wscale.bias'] = (
             f'{res}x{res}/Dense/bias')
-      else:
+      else:   # 如果不是第一层卷积层
         self.add_module(
             f'layer{2 * block_idx}',
-            ConvBlock(in_channels=self.get_nf(res // 2),
+            ConvBlock(in_channels=self.get_nf(res // 2),    # 输入
                       out_channels=self.get_nf(res),
-                      upsample=True,
+                      upsample=True,    # 需要上采样
                       fused_scale=self.fused_scale))
-        if self.fused_scale:
+        if self.fused_scale:    # 是否用upsample+con2v
           self.pth_to_tf_var_mapping[f'layer{2 * block_idx}.weight'] = (
               f'{res}x{res}/Conv0_up/weight')
           self.pth_to_tf_var_mapping[f'layer{2 * block_idx}.wscale.bias'] = (
@@ -141,7 +151,7 @@ class PGGANGeneratorNet(nn.Module):
       self.add_module(
           f'output{block_idx}',
           ConvBlock(in_channels=self.get_nf(res),
-                    out_channels=self.image_channels,
+                    out_channels=self.image_channels,   # 输出层为RGB图像,故通道数为image_channels,一般为3
                     kernel_size=1,
                     padding=0,
                     wscale_gain=1.0,
@@ -150,13 +160,17 @@ class PGGANGeneratorNet(nn.Module):
           f'ToRGB_lod{self.final_res_log2 - res_log2}/weight')
       self.pth_to_tf_var_mapping[f'output{block_idx}.wscale.bias'] = (
           f'ToRGB_lod{self.final_res_log2 - res_log2}/bias')
+    
+    # 上采样方法
     self.upsample = ResolutionScalingLayer()
 
   # 通过resolution计算feature maps的数量,作为输入/输出矩阵的通道数
+  ###  原理待解决
   def get_nf(self, res):
     """Gets number of feature maps according to current resolution."""
     return min(self.fmaps_base // res, self.fmaps_max)
 
+  # 搭建网络
   def forward(self, z):
     if not (len(z.shape) == 2 and z.shape[1] == self.z_space_dim):
       raise ValueError(f'The input tensor should be with shape [batch_size, '
@@ -235,18 +249,13 @@ class ConvBlock(nn.Module):
   layer in sequence.
   """
 
-  """7 x 7 的卷积层的正则等效于 3 个 3 x 3 的卷积层的叠加。(delation rate=2)
-  而这样的设计不仅可以大幅度的减少参数，其本身带有正则性质的 convolution map 能够更容易学
-  一个 generlisable, expressive feature space。
-  """
-
   def __init__(self,
                in_channels,
                out_channels,
                kernel_size=3,   # 卷积核的尺寸, 默认为3
                stride=1,    # 卷积核移动的步长,默认为1
                padding=1,   # 填充宽度默认为1
-               dilation=1,    # 默认扩张率    使用的是空洞卷积（dilated convolution）
+               dilation=1,    # 在卷积核中填充dilation rate-1个0    空洞卷积（dilated convolution） dilation rate =1即退化为普通的卷积
                add_bias=False,
                upsample=False,
                fused_scale=False,
