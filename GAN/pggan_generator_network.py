@@ -38,8 +38,8 @@ class PGGANGeneratorNet(nn.Module):
                fused_scale=False,
               # 层与层之间会有若干个卷积核（kernel），上一层中的每个feature map(特征图)跟每个卷积核做卷积，
               # 对应产生下一层的一个feature map。
-               fmaps_base=16 << 10,   # 1 0000 0000 0000 00, 即2^14   
-               fmaps_max=512):        # 设置为z_space_dim一样的值
+               fmaps_base=16 << 10,   # 2^14   .写成左移10位的目的:  当后面循环中res > 2^5时, fmaps_base // res 就会小于 fmaps_max
+               fmaps_max=512):        # 设置为z_space_dim一样的值, 2^9
     """Initializes the generator with basic settings.
 
     Args:
@@ -61,10 +61,11 @@ class PGGANGeneratorNet(nn.Module):
       raise ValueError(f'Invalid resolution: {resolution}!\n'
                        f'Resolutions allowed: {_RESOLUTIONS_ALLOWED}.')
 
-    self.init_res = _INIT_RES   # 卷积运算选取的卷积核大小, 这里是4*4
+    self.init_res = _INIT_RES   # 4
     self.init_res_log2 = int(np.log2(self.init_res))
-    self.resolution = resolution  # 分辨率 1024*1024默认
-    self.final_res_log2 = int(np.log2(self.resolution))
+    self.resolution = resolution  #　 1024
+    self.final_res_log2 = int(np.log2(self.resolution))     ### 这里两个log是做什么的?
+
     self.z_space_dim = z_space_dim
     self.image_channels = image_channels
     self.fused_scale = fused_scale
@@ -83,20 +84,21 @@ class PGGANGeneratorNet(nn.Module):
     self.lod = nn.Parameter(torch.zeros(()))
     self.pth_to_tf_var_mapping = {'lod': 'lod'}
 
-    for res_log2 in range(self.init_res_log2, self.final_res_log2 + 1):   ### 为什么要取log呢?
-      res = 2 ** res_log2 # 乘方
-      block_idx = res_log2 - self.init_res_log2
+    for res_log2 in range(self.init_res_log2, self.final_res_log2 + 1):   # 范围 [2, 10]
+      res = 2 ** res_log2 # 乘方      res的范围: 4 ~ 1024, 为2的指数倍
+      block_idx = res_log2 - self.init_res_log2   # [0,8]
 
       # First convolution layer for each resolution.
-      if res == self.init_res:        # 第一层卷积层
+      # 第一层卷积块(含多层神经网络)
+      if res == self.init_res:        
         self.add_module(  # def add_module(self, name: str, module: 'Module')
-            f'layer{2 * block_idx}',
+            f'layer{2 * block_idx}',    # block_idx [0, 8]
             # 卷积核的输入通道数（in depth）由输入矩阵的通道数(z_space_dim)所决定
             # 输出矩阵的通道数（out depth）由卷积核的输出通道数所决定(即卷积核或者feature maps的个数)
-            ConvBlock(in_channels=self.z_space_dim,   # 输入的通道数, 即为z_space_dim
-                      out_channels=self.get_nf(res),
+            ConvBlock(in_channels=self.z_space_dim,   # 由于是第一层,故输入的通道数为初始输入矩阵的z_space_dim
+                      out_channels=self.get_nf(res),  # 输出的通道数, 
                       kernel_size=self.init_res,
-                      padding=3))
+                      padding=3))   # padding=3, 默认stride为1, 默认kernel size为3
         self.pth_to_tf_var_mapping[f'layer{2 * block_idx}.conv.weight'] = (
             f'{res}x{res}/Dense/weight')
         self.pth_to_tf_var_mapping[f'layer{2 * block_idx}.wscale.bias'] = (
@@ -150,7 +152,7 @@ class PGGANGeneratorNet(nn.Module):
           f'ToRGB_lod{self.final_res_log2 - res_log2}/bias')
     self.upsample = ResolutionScalingLayer()
 
-  # 计算feature maps的数量,作为输出矩阵的通道数
+  # 通过resolution计算feature maps的数量,作为输入/输出矩阵的通道数
   def get_nf(self, res):
     """Gets number of feature maps according to current resolution."""
     return min(self.fmaps_base // res, self.fmaps_max)
@@ -224,7 +226,7 @@ class WScaleLayer(nn.Module):
   def forward(self, x):
     return x * self.scale + self.bias.view(1, -1, 1, 1)
 
-# 这层依次调用多层神经网络
+# 依次调用多层神经网络,构成一个神经网络块
 class ConvBlock(nn.Module):
   """Implements the convolutional block.
 
@@ -233,13 +235,18 @@ class ConvBlock(nn.Module):
   layer in sequence.
   """
 
+  """7 x 7 的卷积层的正则等效于 3 个 3 x 3 的卷积层的叠加。(delation rate=2)
+  而这样的设计不仅可以大幅度的减少参数，其本身带有正则性质的 convolution map 能够更容易学
+  一个 generlisable, expressive feature space。
+  """
+
   def __init__(self,
                in_channels,
                out_channels,
-               kernel_size=3,   # 卷积核的尺寸
-               stride=1,    # 卷积核移动的步长
-               padding=1,   # 填充宽度
-               dilation=1,
+               kernel_size=3,   # 卷积核的尺寸, 默认为3
+               stride=1,    # 卷积核移动的步长,默认为1
+               padding=1,   # 填充宽度默认为1
+               dilation=1,    # 默认扩张率    使用的是空洞卷积（dilated convolution）
                add_bias=False,
                upsample=False,
                fused_scale=False,
@@ -272,14 +279,14 @@ class ConvBlock(nn.Module):
     if upsample and not fused_scale:
       self.upsample = ResolutionScalingLayer()  # 上采样提高分辨率
     else:
-      self.upsample = nn.Identity()   # 占位, 不区分参数
+      self.upsample = nn.Identity()   # 不进行上采样. 仅占位, 不区分参数
 
     if upsample and fused_scale:    # fused_scale=True, 则融合upsample和conv2d
       self.use_conv2d_transpose = True
-      self.weight = nn.Parameter(
+      self.weight = nn.Parameter(   # 
           torch.randn(kernel_size, kernel_size, in_channels, out_channels))
       fan_in = in_channels * kernel_size * kernel_size
-      self.scale = wscale_gain / np.sqrt(fan_in)
+      self.scale = wscale_gain / np.sqrt(fan_in)    # wscale_gain = 根号2
     else:
       self.use_conv2d_transpose = False
       self.conv = nn.Conv2d(in_channels=in_channels,

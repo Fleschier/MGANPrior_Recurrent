@@ -81,7 +81,7 @@ class PGGANGenerator(BaseGenerator):
       state_dict[pth_var_name] = var
     self.logger.info(f'Successfully converted!')
 
-    # 保存pytorch版本
+    # 保存
     self.logger.info(f'Saving pytorch weights to `{self.weight_path}`.')
     for var_name in self.model_specific_vars:
       del state_dict[var_name]
@@ -111,12 +111,14 @@ class PGGANGenerator(BaseGenerator):
 
     sess.close()
 
-  # 从通道中采样
+  # 按照z_space_dim的大小和num随机生成对应尺寸的latent code
+  # num应当小于batch_size
+  # 生成的随机数满足正态分布
   def sample(self, num, **kwargs):
     assert num > 0
-    return np.random.randn(num, self.z_space_dim).astype(np.float32)
+    return np.random.randn(num, self.z_space_dim).astype(np.float32)  # float32类型的 num*z_space_dim大小的latent code
 
-  # 预处理
+  # 预处理latent codes
   def preprocess(self, latent_codes, **kwargs):
     if not isinstance(latent_codes, np.ndarray):
       raise ValueError(f'Latent codes should be with type `numpy.ndarray`!')
@@ -126,7 +128,7 @@ class PGGANGenerator(BaseGenerator):
     latent_codes = latent_codes / norm * np.sqrt(self.z_space_dim)
     return latent_codes.astype(np.float32)
 
-  # 从latent codes中生成图片
+  # 从latent codes中生成图片  *********************************
   def _synthesize(self, latent_codes):
     if not isinstance(latent_codes, np.ndarray):
       raise ValueError(f'Latent codes should be with type `numpy.ndarray`!')
@@ -139,8 +141,8 @@ class PGGANGenerator(BaseGenerator):
                        f'{self.z_space_dim}!\n'
                        f'But {latent_codes.shape} received!')
 
-    zs = torch.from_numpy(latent_codes).type(torch.FloatTensor)
-    zs = zs.to(self.run_device)
+    zs = torch.from_numpy(latent_codes).type(torch.FloatTensor)   # 转化为pytorch tensor
+    zs = zs.to(self.run_device)   # 放入GPU运算
     images = self.net(zs)
     results = {
         'z': latent_codes,

@@ -149,7 +149,7 @@ class BaseGenerator(object):
     self.net.load_state_dict(state_dict)
     self.logger.info(f'Successfully loaded!')
 
-  # 如果是tensorflow模型,则加载之后转化
+  # 如果是tensorflow模型,则加载之后转化为pytorch
   # 需要被复写
   def convert_tf_weights(self, test_num=10):
     """Converts weights from tensorflow version.
@@ -197,6 +197,7 @@ class BaseGenerator(object):
     total_num = inputs.shape[0]
     batch_size = batch_size or self.batch_size
     for i in range(0, total_num, batch_size):
+      # 一次返回batch_size个inputs
       yield inputs[i:i + batch_size]    # yield是一个生成器,有些类似于return, 在下次调用next()的时候返回上一次返回的地方继续执行
 
   # 分批输入运行, 最后组合输出结果
@@ -272,7 +273,7 @@ class BaseGenerator(object):
     """
     raise NotImplementedError(f'Should be implemented in derived class!')
 
-    # 预处理latent codes, 需子类复写
+    # 处理sample()生成的latent codes, 需子类复写
   def preprocess(self, latent_codes, **kwargs):
     """Preprocesses the input latent codes if needed.
 
