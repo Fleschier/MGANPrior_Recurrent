@@ -16,7 +16,7 @@ def _tanh_to_sigmoid(x):
     """
     return x * 0.5 + 0.5
 
-
+# 将batch值增加1, 因为tensor的最低维的第一个值表示的是batch_size
 def _add_batch_one(tensor):
     """
     Return a tensor with size (1, ) + tensor.size
@@ -25,7 +25,7 @@ def _add_batch_one(tensor):
     """
     return tensor.view((1, ) + tensor.size())
 
-
+# 去除第一维, 即去除batch_size
 def _remove_batch(tensor):
     """
     Return a tensor with size tensor.size()[1:]

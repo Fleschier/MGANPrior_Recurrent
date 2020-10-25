@@ -14,9 +14,9 @@ import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '..'))
 
 # 使用绝对路径
-from models import Model_Settings
-from models.base_generator import BaseGenerator
-from models.stylegan2_generator_network import StyleGAN2GeneratorNet
+from GAN import Model_Settings
+from GAN.base_generator import BaseGenerator
+from GAN.stylegan2_generator_network import StyleGAN2GeneratorNet
 
 __all__ = ['StyleGAN2Generator']
 

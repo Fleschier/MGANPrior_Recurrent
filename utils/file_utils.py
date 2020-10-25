@@ -2,7 +2,7 @@ import os
 from PIL import Image
 import torchvision
 
-
+# 可识别的图片后缀名
 IMG_EXTENSIONS = ['jpg', 'jpeg', 'png', 'ppm', 'bmp', 'pgm']
 
 
@@ -20,9 +20,10 @@ def pil_loader(path, mode='RGB'):
     assert _is_image_file(path), "%s is not an image" % path
     with open(path, 'rb') as f:
         with Image.open(f) as img:
-            return img.convert(mode)
+            return img.convert(mode)    # 返回图片转化后的复制
 
 
+# 读入图片, 转化为tensor
 def load_as_tensor(path, mode='RGB'):
     """
     Load image to tensor
@@ -35,17 +36,16 @@ def load_as_tensor(path, mode='RGB'):
     else:
         return PIL2Tensor(pil_loader(path, mode='YCbCr'))[:1]
 
-
+ # PIL image和tensor互化
 def PIL2Tensor(pil_image):
-    return torchvision.transforms.functional.to_tensor(pil_image)
-
+    return torchvision.transforms.functional.to_tensor(pil_image)   # Convert a tensor or an ndarray to PIL Image.
 
 def Tensor2PIL(tensor_image, mode='RGB'):
     if len(tensor_image.size()) == 4 and tensor_image.size()[0] == 1:
         tensor_image = tensor_image.view(tensor_image.size()[1:])
     return torchvision.transforms.functional.to_pil_image(tensor_image.detach(), mode=mode)
 
-
+# 根据后缀判断是否为图片
 def _is_image_file(filename):
     """
     judge if the file is an image file
@@ -56,6 +56,7 @@ def _is_image_file(filename):
     return any(filename_lower.endswith(ext) for ext in IMG_EXTENSIONS)
 
 
+# 获取目录下的所有图片的路径
 def image_files(path):
     """
     return list of images in the path
@@ -69,7 +70,7 @@ def image_files(path):
             image_files[i] = os.path.join(abs_path, image_files[i])
     return image_files
 
-
+# 按照batch大小将数据进行拆分
 def split_to_batches(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]

@@ -81,7 +81,7 @@ class PGGANGeneratorNet(nn.Module):
     # 使用这个函数的目的也是想让某些变量在学习的过程中不断的修改其值以达到最优化。
 
     # 使用nn.Parameter()来转换一个固定的权重数值，使的其可以跟着网络训练一直调优下去，学习到一个最适合的权重值。
-    self.lod = nn.Parameter(torch.zeros(()))
+    self.lod = nn.Parameter(torch.zeros(()))  # tensor(0., requires_grad=True)
     self.pth_to_tf_var_mapping = {'lod': 'lod'}   # 保存每一层网络的权重和偏置的路径
 
     for res_log2 in range(self.init_res_log2, self.final_res_log2 + 1):   # 范围 [2, 10]
@@ -94,13 +94,12 @@ class PGGANGeneratorNet(nn.Module):
       或者理解为,卷积层分为三级: 卷积级, 探测级(使用激励函数非线性化), 池化级
       """
       if res == self.init_res:          # 接收输入的第一层卷积层
-        self.add_module(  
-            """
-            输入参数为Module.add_module(name: str, module: Module)。
-            功能为，为Module添加一个子module，对应名字为name
-            用torch.nn.Sequential()容器进行快速搭建时，模型的各层被顺序添加到容器中。缺点是每层的编号是默认的阿拉伯数字，不易区分
-            通过add_module()添加每一层，并且为每一层增加了一个单独的名字。
-            """
+
+        self.add_module( 
+          # 输入参数为Module.add_module(name: str, module: Module)。
+          # 功能为，为Module添加一个子module，对应名字为name
+          # 用torch.nn.Sequential()容器进行快速搭建时，模型的各层被顺序添加到容器中。缺点是每层的编号是默认的阿拉伯数字，不易区分
+          # 通过add_module()添加每一层，并且为每一层增加了一个单独的名字。 
             f'layer{2 * block_idx}',    # block_idx [0, 8]
             # 卷积核的输入通道数（in depth）由输入矩阵的通道数(z_space_dim)所决定
             # 输出矩阵的通道数（out depth）由卷积核的输出通道数所决定(即卷积核或者feature maps的个数)
@@ -113,7 +112,7 @@ class PGGANGeneratorNet(nn.Module):
             f'{res}x{res}/Dense/weight')
         self.pth_to_tf_var_mapping[f'layer{2 * block_idx}.wscale.bias'] = (
             f'{res}x{res}/Dense/bias')
-      else:   # 如果不是第一层卷积层
+      else:   # 如果不是第一层
         self.add_module(
             f'layer{2 * block_idx}',
             ConvBlock(in_channels=self.get_nf(res // 2),    # 输入
@@ -152,7 +151,7 @@ class PGGANGeneratorNet(nn.Module):
           f'output{block_idx}',
           ConvBlock(in_channels=self.get_nf(res),
                     out_channels=self.image_channels,   # 输出层为RGB图像,故通道数为image_channels,一般为3
-                    kernel_size=1,
+                    kernel_size=1,    # 使用size=1的kernel达到将z_dim快速降下来并且不损失图像原有尺寸精度的效果
                     padding=0,
                     wscale_gain=1.0,
                     activation_type='linear'))
@@ -164,7 +163,7 @@ class PGGANGeneratorNet(nn.Module):
     # 上采样方法
     self.upsample = ResolutionScalingLayer()
 
-  # 通过resolution计算feature maps的数量,作为输入/输出矩阵的通道数
+  # 通过当前resolution计算feature maps的数量,作为输入/输出矩阵的通道数
   ###  原理待解决
   def get_nf(self, res):
     """Gets number of feature maps according to current resolution."""
@@ -177,20 +176,29 @@ class PGGANGeneratorNet(nn.Module):
                        f'latent_space_dim], where `latent_space_dim` equals to '
                        f'{self.z_space_dim}!\n'
                        f'But {z.shape} received!')
+
+    # view()方法使得x和z共享相同的底层数据,改动x也会影响z
+    # z就是一个 batch_size * z_space_dim的张量
+    # x只是z的另一个形状的表达, x为 z.shap[0] * z_space_dim * 1 * 1的tensor
     x = z.view(z.shape[0], self.z_space_dim, 1, 1)
 
-    lod = self.lod.cpu().tolist()
+    lod = self.lod.cpu().tolist() # 将训练的权值加载到CPU以便操作,此时lod是一个数值
+
     for res_log2 in range(self.init_res_log2, self.final_res_log2 + 1):
+      # 小于权重阈值的放入神经网络训练
       if res_log2 + lod <= self.final_res_log2:
         block_idx = res_log2 - self.init_res_log2
-        x = self.__getattr__(f'layer{2 * block_idx}')(x)
+        x = self.__getattr__(f'layer{2 * block_idx}')(x)    # 将x放入神经网络训练
         x = self.__getattr__(f'layer{2 * block_idx + 1}')(x)
         image = self.__getattr__(f'output{block_idx}')(x)
       else:
+        # 大于权重阈值的进行上采样提高分辨率
         image = self.upsample(image)
+
+    
     return image
 
-# 实现逐像素特征向量归一化层
+# 像素特征向量归一化层
 class PixelNormLayer(nn.Module):
   """Implements pixel-wise feature vector normalization layer."""
 
