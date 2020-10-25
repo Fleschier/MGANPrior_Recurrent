@@ -107,7 +107,7 @@ if(__name__ == '__main__'):
 
     # VGG作为一种广泛使用的深度神经网络，其卷积层在一定程度上能够提取图像的特征信息.
     # 令pre-trained VGG的卷积层作为误差网络，将生成网络生成的图像 y~ 输入误差网络计算每个卷积层得到的特征，
-    # 再将这些特征跟y-truth(即原始图像)作比较得到感知误差
+    # 再将这些特征跟y-truth(即原始图像)作比较得到感知误差(perceptual loss)
     # 计算Loss相关的参数
     # 图片的size，默认是256*256. 输入图片用来放入VGG网络计算与GAN的generator生产的图片之间的loss
     parser.add_argument('--image_size', type=int, default=256,
@@ -138,7 +138,7 @@ if(__name__ == '__main__'):
                         help='Number of optimization steps.', type=int)
 
     # Video Settings
-    parser.add_argument('--video', type=bool, default=False, help='Save video. False for no video.')
+    parser.add_argument('--video', type=bool, default=True, help='Save video. False for no video.')
     parser.add_argument('--fps', type=int, default=24, help='Frame rate of the created video.')
 
 
