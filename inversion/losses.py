@@ -10,12 +10,12 @@ def get_loss(loss_name, args):
         return VGGLoss(args.vgg_layer, args)
     elif loss_name == 'L1':
         return nn.L1Loss(reduction='mean')
-    elif loss_name == 'L2':
+    elif loss_name == 'L2':             # L2 loss 也叫MSE loss, 均方差（Mean Squared Error，MSE）损失.
         return nn.MSELoss(reduction='mean')
     elif loss_name == 'Combine':
         return CombinationLoss(args)
 
-
+# 使用perceptual Loss + MSE
 class CombinationLoss(nn.Module):
     def __init__(self, args):
         super(CombinationLoss, self).__init__()

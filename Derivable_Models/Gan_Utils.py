@@ -11,8 +11,8 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '..'))
 # 使用绝对路径
 from GAN.Model_Settings import MODEL_POOL
 from GAN.pggan_generator import PGGANGenerator
-from GAN.stylegan_generator import StyleGANGenerator
-from GAN.stylegan2_generator import StyleGAN2Generator
+# from GAN.stylegan_generator import StyleGANGenerator
+# from GAN.stylegan2_generator import StyleGAN2Generator
 
 
 PGGAN_Inter_Output_Layer_256 = [-1, 17, 14, 11, 8, 5, 2]
@@ -29,10 +29,10 @@ def build_generator(model_name, logger=None):
 
   if gan_type == 'pggan':
     return PGGANGenerator(model_name, logger=logger)
-  if gan_type == 'stylegan':
-    return StyleGANGenerator(model_name, logger=logger)
-  if gan_type == 'stylegan2':
-    return StyleGAN2Generator(model_name, logger=logger)
+  # if gan_type == 'stylegan':
+  #   return StyleGANGenerator(model_name, logger=logger)
+  # if gan_type == 'stylegan2':
+  #   return StyleGAN2Generator(model_name, logger=logger)
   raise NotImplementedError(f'Unsupported GAN type `{gan_type}`!')
 
 

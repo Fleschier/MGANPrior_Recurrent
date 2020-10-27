@@ -40,12 +40,12 @@ PGGAN_LAYER_MAPPING = {  # The new PGGAN includes the intermediate output layer,
 def get_derivable_generator(gan_model_name, generator_type, args):
     if generator_type == 'PGGAN-z':  # Single latent code
         return PGGAN(gan_model_name)
-    elif generator_type == 'StyleGAN-z':
-        return StyleGAN(gan_model_name, 'z')
-    elif generator_type == 'StyleGAN-w':
-        return StyleGAN(gan_model_name, 'w')
-    elif generator_type == 'StyleGAN-w+':
-        return StyleGAN(gan_model_name, 'w+')
+    # elif generator_type == 'StyleGAN-z':
+    #     return StyleGAN(gan_model_name, 'z')
+    # elif generator_type == 'StyleGAN-w':
+    #     return StyleGAN(gan_model_name, 'w')
+    # elif generator_type == 'StyleGAN-w+':
+    #     return StyleGAN(gan_model_name, 'w+')
     elif generator_type == 'PGGAN-Multi-Z':  # Multiple Latent Codes            # 默认使用此类型
         return PGGAN_multi_z(gan_model_name, args.composing_layer, args.z_number, args)
     else:
@@ -69,36 +69,36 @@ class PGGAN(nn.Module):
         return self.pggan(latent)
 
 
-class StyleGAN(nn.Module):
-    def __init__(self, gan_model_name, start):
-        super(StyleGAN, self).__init__()
-        self.stylegan = get_gan_model(gan_model_name).net
-        self.start = start
-        self.init = False
+# class StyleGAN(nn.Module):
+#     def __init__(self, gan_model_name, start):
+#         super(StyleGAN, self).__init__()
+#         self.stylegan = get_gan_model(gan_model_name).net
+#         self.start = start
+#         self.init = False
 
-    def input_size(self):
-        if self.start == 'z' or self.start == 'w':
-            return [(512,)]
-        elif self.start == 'w+':
-            return [(self.stylegan.net.synthesis.num_layers, 512)]
+#     def input_size(self):
+#         if self.start == 'z' or self.start == 'w':
+#             return [(512,)]
+#         elif self.start == 'w+':
+#             return [(self.stylegan.net.synthesis.num_layers, 512)]
 
-    def cuda(self, device=None):
-        self.stylegan.cuda(device=device)
+#     def cuda(self, device=None):
+#         self.stylegan.cuda(device=device)
 
-    def forward(self, latent):
-        z = latent[0]
-        if self.start == 'z':
-            w = self.stylegan.net.mapping(z)
-            w = self.stylegan.net.truncation(w)
-            x = self.stylegan.net.synthesis(w)
-            return x
-        elif self.start == 'w':
-            z = z.view((-1, self.stylegan.net.synthesis.num_layers, self.stylegan.net.synthesis.w_space_dim))
-            x = self.stylegan.net.synthesis(z)
-            return x
-        elif self.start == 'w+':
-            x = self.stylegan.net.synthesis(z)
-            return x
+#     def forward(self, latent):
+#         z = latent[0]
+#         if self.start == 'z':
+#             w = self.stylegan.net.mapping(z)
+#             w = self.stylegan.net.truncation(w)
+#             x = self.stylegan.net.synthesis(w)
+#             return x
+#         elif self.start == 'w':
+#             z = z.view((-1, self.stylegan.net.synthesis.num_layers, self.stylegan.net.synthesis.w_space_dim))
+#             x = self.stylegan.net.synthesis(z)
+#             return x
+#         elif self.start == 'w+':
+#             x = self.stylegan.net.synthesis(z)
+#             return x
 
 
 # 默认类型

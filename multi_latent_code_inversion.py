@@ -11,10 +11,10 @@ from GAN.Model_Settings import MODEL_POOL
 from utils.image_precossing import _sigmoid_to_tanh, _tanh_to_sigmoid, _add_batch_one
 from utils.manipulate import convert_array_to_images
 
-# 参数
+# 超参
 # 加载的模型名称
 tf_model_name = 'pggan_churchoutdoor'
-# 模仿的图片的路径
+# 输入的图片的路径
 default_load_img_pth='./examples/gan_inversion/church'
 # 输出结果图片的路径
 output_pth='./inversion_output'
@@ -29,7 +29,7 @@ def run(args):
     os.makedirs(args.outputs,exist_ok=True) # 生成输出路径文件夹，存在则跳过
     # 生成器
     generator = get_derivable_generator(args.gan_model, args.inversion_type, args)
-    loss = get_loss(args.loss_type, args)       # 计算误差
+    loss = get_loss(args.loss_type, args)       # 损失函数
     generator.cuda()    # pytorch需要手动放入GPU进行运算
     loss.cuda()
     inversion = get_inversion(args.optimization, args)

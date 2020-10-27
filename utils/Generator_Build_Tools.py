@@ -6,8 +6,8 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)+'/'+'..'))
 
 from GAN.Model_Settings import MODEL_POOL
 from GAN.pggan_generator import PGGANGenerator
-from GAN.stylegan_generator import StyleGANGenerator
-from GAN.stylegan2_generator import StyleGAN2Generator
+# from GAN.stylegan_generator import StyleGANGenerator
+# from GAN.stylegan2_generator import StyleGAN2Generator
 
 __all__ = ['build_generator']
 
@@ -22,10 +22,10 @@ def build_generator(model_name, logger=None):
 
     if(gan_type == 'pggan'):
         return PGGANGenerator(model_name, logger=logger)
-    elif(gan_type == 'stylegan'):
-        return StyleGANGenerator(model_name,logger=logger)
-    elif(gan_type == 'stylegan2'):
-        return StyleGAN2Generator(model_name, logger=logger)
+    # elif(gan_type == 'stylegan'):
+    #     return StyleGANGenerator(model_name,logger=logger)
+    # elif(gan_type == 'stylegan2'):
+    #     return StyleGAN2Generator(model_name, logger=logger)
     else:
         raise NotImplementedError(f'不支持的GAN类型! {gan_type}')
 
