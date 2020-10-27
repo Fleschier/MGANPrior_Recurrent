@@ -65,11 +65,11 @@ def main(args):
         y_estimate_list = torch.split(torch.clamp(_tanh_to_sigmoid(generator(latent_estimates)), min=0., max=1.).cpu(), 1, dim=0)
         # 保存结果
         for img_id, image in enumerate(images):
-            up_nn, up_bic, down = downsample_images(image_tensor_list[img_id], factor=args.factor, mode=args.down)
-            y_nn_pil = Tensor2PIL(up_nn)
+           # up_nn, up_bic, down = downsample_images(image_tensor_list[img_id], factor=args.factor, mode=args.down)
+           # y_nn_pil = Tensor2PIL(up_nn)        # 低分辨率化后的图像
             y_estimate_pil = Tensor2PIL(y_estimate_list[img_id])
             y_estimate_pil.save(os.path.join(os.path.join(args.outputs, '%s.png' % image_name_list[img_id][:-4])))
-            y_nn_pil.save(os.path.join(os.path.join(args.outputs, '%s-nn.png' % image_name_list[img_id][:-4])))
+            #y_nn_pil.save(os.path.join(os.path.join(args.outputs, '%s-nn.png' % image_name_list[img_id][:-4])))
             # Create video
             if args.video:
                 print('Create GAN-Inversion video.')

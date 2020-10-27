@@ -37,7 +37,7 @@ def convert2target(image, mode='nearest'):
         img = F.interpolate(image, scale_factor=pre_factor, mode=mode)
     return img
 
-# 检测给定的输入并自动转化到适合的输入尺寸
+# 测试
 def convert_to_targetsize_test(image, factor, mode='nearest'):
     # params:
     # 确保inputsize 是 1024的因子或者是1024的整数倍
