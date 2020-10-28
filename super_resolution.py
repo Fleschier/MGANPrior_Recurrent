@@ -28,7 +28,7 @@ output_pth='SR_output'
 # 学习率
 learning_rate = 1.
 # 迭代次数
-iterations = 2000
+iterations = 5000
 # batch size
 BATCH_SIZE = 1
 
@@ -111,7 +111,7 @@ if __name__ == '__main__':
     # Super-resolution
     parser.add_argument('--down', type=str, default='bilinear',
                         help='Downsampling method.')
-    parser.add_argument('--factor', type=int, default=16,
+    parser.add_argument('--factor', type=int, default=8,        # default=8 or 16?
                         help='SR factor.')
     # Loss Parameters
     parser.add_argument('--image_size', default=256,

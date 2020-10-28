@@ -30,7 +30,10 @@ def SR_loss(loss_function, down_type='bilinear', factor=8):     # mode默认为�
     def loss(x, gt):
         x = F.interpolate(x, scale_factor=1/factor, mode=down_type) # 下采样
         gt = F.interpolate(gt, scale_factor=1/factor, mode=down_type)
-        return loss_function(x, gt)
+        return loss_function(x, gt)   # 返回CombinationLoss类的forward(self, x, gt)方法的返回值
+                                          #  return self.l1_lambda * l1 + \
+                                          #  self.l2_lambda * l2 + \
+                                          #  self.vgg_lambda * vgg
     return loss
 
 

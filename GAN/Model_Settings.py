@@ -338,17 +338,6 @@ MODEL_POOL = {
 }
 # pylint: enable=line-too-long
 
-# # Settings for StyleGAN.
-# # 截断
-# STYLEGAN_TRUNCATION_PSI = 0.7  # 1.0 means no truncation
-# STYLEGAN_TRUNCATION_LAYERS = 8  # 0 means no truncation
-# STYLEGAN_RANDOMIZE_NOISE = False
-
-# # Settings for StyleGAN2.
-# STYLEGAN2_TRUNCATION_PSI = 0.5  # 1.0 means no truncation
-# STYLEGAN2_TRUNCATION_LAYERS = 18  # 0 means no truncation
-# STYLEGAN2_RANDOMIZE_NOISE = False
-
 # Settings for model running.
 # 默认使用GPU
 USE_CUDA = True
