@@ -15,8 +15,8 @@ def downsample_images(image, factor, mode):
     up_nn = F.interpolate(down, scale_factor=factor, mode='nearest')
     up_bic = F.interpolate(down, scale_factor=factor, mode='bilinear')
     return up_nn, up_bic
-
-def convert2target(image, mode='nearest'):
+  
+def convert2target(image, mode='bilinear'):
     # print("img: ", image.size())      # torch.Size([1, 3, 1024, 1024])
     height, weight = image.size()[2], image.size()[3]       # 获取图片维度信息
     print('img size: ', height, 'x', weight)

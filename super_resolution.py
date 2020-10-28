@@ -54,7 +54,7 @@ def main(args):
         for image in images:
             image_name_list.append(os.path.split(image)[1])
             # image = _add_batch_one(load_as_tensor(image))
-            image = convert2target(_add_batch_one(load_as_tensor(image)), 'nearest')        # 转化
+            image = convert2target(_add_batch_one(load_as_tensor(image)), 'nearest')    # 更改size使得适用于更多类型的分辨率图像
             image_tensor_list.append(image)
             # print("add..: ", _add_batch_one(load_as_tensor(image)).size())      # torch.Size([1, 3, 64, 64])
 

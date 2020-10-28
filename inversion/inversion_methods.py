@@ -25,7 +25,7 @@ class GradientDescent(object):
     # latent_estimates, history = inversion.invert(generator, y_gt, loss, batch_size=1, video=args.video)
     def invert(self, generator, gt_image, loss_function, batch_size=1, video=False, *init):
         input_size_list = generator.input_size()    #  def input_size(self):
-                                                                                                    #return [(self.z_number, self.z_dim), (self.z_number, self.layer_c_number)]
+                                                        #return [(self.z_number, self.z_dim), (self.z_number, self.layer_c_number)]
         if len(init) == 0:
             if generator.init is False:
                 latent_estimate = []
@@ -35,13 +35,14 @@ class GradientDescent(object):
                     elif self.init_type == 'Normal':
                         latent_estimate.append(torch.randn((batch_size,) + input_size).cuda())
             else:
-                latent_estimate = list(generator.init_value(batch_size))    # 随机初始化estimate
+                latent_estimate = list(generator.init_value(batch_size))    # 随机初始化estimate： return [z_estimate, z_alpha]
         else:
             assert len(init) == len(input_size_list), 'Please check the number of init value'
             latent_estimate = init
 
         for latent in latent_estimate:
             latent.requires_grad = True
+        # 将z_estimate和z_alpha放入优化器迭代优化
         optimizer = self.optimizer(latent_estimate, lr=self.lr)
 
         history = []
