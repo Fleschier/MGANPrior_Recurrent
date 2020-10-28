@@ -36,7 +36,7 @@ def main(args):
     os.makedirs(args.outputs, exist_ok=True)
     generator = get_derivable_generator(args.gan_model, args.inversion_type, args)  # 生成器
     loss = get_loss(args.loss_type, args)
-    sr_loss = SR_loss(loss, args.down, args.factor)
+    sr_loss = SR_loss(loss, args.down, args.factor)     # SR计算loss的方式
     # to cuda
     generator.cuda()
     loss.cuda()
@@ -62,6 +62,8 @@ def main(args):
         # Invert
         latent_estimates, history = inversion.invert(generator, y_gt, sr_loss, batch_size=BATCH_SIZE, video=args.video)
         # Get Images
+        # 将optimizer优化好的latent_estimates再放入generator中生成图像
+        # 并且将batch_size那一列的数据去除
         y_estimate_list = torch.split(torch.clamp(_tanh_to_sigmoid(generator(latent_estimates)), min=0., max=1.).cpu(), 1, dim=0)
         # 保存结果
         for img_id, image in enumerate(images):
@@ -80,7 +82,7 @@ def main(args):
                     frameSize=(frameSize, frameSize))
                 print('Save frames.')
                 for i, sample in enumerate(history):
-                    image = generator(sample)
+                    image = generator(sample)   # 用generator从history（保存的训练中的estimate_latent的值）中生成图像
                     image_cv2 = convert_array_to_images(image.detach().cpu().numpy())[0][:, :, ::-1]
                     video.write(image_cv2)
                 video.release()
