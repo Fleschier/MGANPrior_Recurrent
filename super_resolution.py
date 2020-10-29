@@ -111,7 +111,7 @@ if __name__ == '__main__':
     # Super-resolution
     parser.add_argument('--down', type=str, default='bilinear',
                         help='Downsampling method.')
-    parser.add_argument('--factor', type=int, default=8,        # default=8 or 16?
+    parser.add_argument('--factor', type=int, default=16,        # default=8 or 16?
                         help='SR factor.')
     # Loss Parameters
     parser.add_argument('--image_size', default=256,

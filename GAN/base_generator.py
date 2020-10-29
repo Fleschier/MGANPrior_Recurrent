@@ -261,7 +261,7 @@ class BaseGenerator(object):
       results[key] = np.concatenate(val, axis=0)
     return results if temp_key not in results else results[temp_key]
 
-  # 选择样本latent codes, 需子类复写
+  # 随机生成样本latent codes, 需子类复写
   def sample(self, num, **kwargs):
     """Samples latent codes randomly.
 

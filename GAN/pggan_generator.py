@@ -37,8 +37,8 @@ class PGGANGenerator(BaseGenerator):
   def build(self):
     self.check_attr('fused_scale')
     # 初始化神经网络
-    self.net = PGGANGeneratorNet(resolution=self.resolution,
-                                 z_space_dim=self.z_space_dim,
+    self.net = PGGANGeneratorNet(resolution=self.resolution,    # 1024
+                                 z_space_dim=self.z_space_dim,  # 512
                                  image_channels=self.image_channels,
                                  fused_scale=self.fused_scale)
     self.num_layers = self.net.num_layers

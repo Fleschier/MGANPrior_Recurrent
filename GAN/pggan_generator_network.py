@@ -64,7 +64,7 @@ class PGGANGeneratorNet(nn.Module):
     self.init_res = _INIT_RES   # 4
     self.init_res_log2 = int(np.log2(self.init_res))
     self.resolution = resolution  #　 1024
-    self.final_res_log2 = int(np.log2(self.resolution))     ### 这里两个log是做什么的?
+    self.final_res_log2 = int(np.log2(self.resolution))     ### 网络每经过一次卷积块，分辨率扩大一倍， 故据此计算循环次数
 
     self.z_space_dim = z_space_dim
     self.image_channels = image_channels
@@ -299,17 +299,32 @@ class ConvBlock(nn.Module):
       self.upsample = nn.Identity()   # 不进行上采样. 仅占位, 不区分参数
 
     if upsample and fused_scale:    # fused_scale=True, 则融合upsample和conv2d
-      self.use_conv2d_transpose = True
-      self.weight = nn.Parameter(   # 
+      
+      # 当给一个特征图a, 以及给定的卷积核设置，我们分为三步进行逆卷积操作：
+      # 第一步：对输入的特征图a进行一些变换，得到新的特征图a’，专业名词叫做interpolation，也就是插值。
+      # 新的特征图：Height'=Height+(Stride-1)*(Height-1)，Width同样的   即将特征图插值（上采样）
+      # 第二步：求新的卷积核设置，得到新的卷积核设置
+      # 新的卷积核：Stride'=1这个数不变，无论你输入是什么。kernel的size′也不变,=Size, padding′为Size−padding−1.
+      # 第三步：用新的卷积核在新的特征图上做常规的卷积，得到的结果就是逆卷积的结果，就是我们要求的结果。
+
+      # 例：输入特征图A：3∗3
+      # 输入卷积核K：kernel为 3∗3， stride为2，padding为1
+      # 新的特征图A’：3 + (3-1)*(2-1) = 3+2 = 5，注意加上padding之后才是7。
+      # 新的卷积核设置K’: kernel不变，stride为1，padding=3−1−1=1
+      # 最终结果：( 5 + 2 − 3 ) / 1 + 1 = 5 (5+2-3)/1+1=5(5+2−3)/1+1=5
+
+      self.use_conv2d_transpose = True  # 逆卷积ConvTranspose2d（学术名叫fractionally-strided convolutions）
+      self.weight = nn.Parameter(   # 权重， 放入网络迭代优化
           torch.randn(kernel_size, kernel_size, in_channels, out_channels))
       fan_in = in_channels * kernel_size * kernel_size
       self.scale = wscale_gain / np.sqrt(fan_in)    # wscale_gain = 根号2
     else:
       self.use_conv2d_transpose = False
+      # Conv2d：二维卷积运算，即卷积层
       self.conv = nn.Conv2d(in_channels=in_channels,
                             out_channels=out_channels,
                             kernel_size=kernel_size,
-                            stride=stride,
+                            stride=stride, 
                             padding=padding,
                             dilation=dilation,
                             groups=1,
@@ -341,7 +356,7 @@ class ConvBlock(nn.Module):
       kernel = (kernel[1:, 1:] + kernel[:-1, 1:] +
                 kernel[1:, :-1] + kernel[:-1, :-1])
       kernel = kernel.permute(2, 3, 0, 1)
-      x = F.conv_transpose2d(x, kernel, stride=2, padding=1)
+      x = F.conv_transpose2d(x, kernel, stride=2, padding=1)  # 进行逆卷积运算
       x = x / self.scale
     else:
       x = self.conv(x)
